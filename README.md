@@ -1,5 +1,5 @@
 # LiDAR_PONG
-Code for LiDAR_PONG EPE demo made for Tyndall National Institute / IPIC
+Code for LiDAR Pong EPE demo made for Tyndall National Institute / IPIC
 
 LiDAR Pong is an interactive demo/activity suitable for all ages. It is designed to intuitively showcase the finite speed of light using LiDAR technology.
 
