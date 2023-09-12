@@ -11,5 +11,3 @@ Download Arduino IDE.
 Install 'Adafruit Neomatrix' + dependencies from extensions tab.
 
 Connect Arduino DUE to computer via 'programming' usb port - this is the one closest to the black DC connector.
-
-Upload downloaded code to the arduino by pressing the upload button in top let corner (V1.1 is optimal and includes 'easy mode' option for younger children).
