@@ -7,7 +7,7 @@ GIF:
 
 LiDAR Pong is an interactive demo/activity suitable for all ages. It is designed to intuitively showcase the finite speed of light using LiDAR technology.
 
-.ino files sourced here are intended for use with ARM based Arduino boards (Arduino DUE)
+.ino files sourced here are intended for use with ARM based Arduino boards (e.g. Arduino DUE)
 
 ## Instructions
 Download Arduino IDE.
