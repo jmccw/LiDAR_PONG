@@ -143,8 +143,8 @@ void reset() { //resets animation after a player fails to deflect the ball and d
   //ballPop();
   bool go = false;
   int count = 0;
-  _px = random(16, 18);//EDIT V1.1
-  _py = random(6, 26); //EDIT V1.1
+  _px = 15;//random(16, 18);//EDIT V1.1
+  _py = 12;//random(6, 26); //EDIT V1.1
   _angle = random(0, 2) < 1 ? 0 : 180; //EDIT V1.1
   _speed = DEFAULT_SPEED;
   colision = 0;
