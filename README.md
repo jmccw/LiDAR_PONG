@@ -19,8 +19,5 @@ LiDAR Pong is an interactive demo/activity suitable for all ages. It is designed
 
 
 ## Instructions
-Download Arduino IDE.
-
-Install 'Adafruit Neomatrix' + dependencies from extensions tab.
 
 Follow Instructions listed in Activity Template for Hardware Setup
