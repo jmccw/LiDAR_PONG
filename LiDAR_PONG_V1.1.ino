@@ -1,24 +1,53 @@
-// LiDAR_PONG_V1.1
+// LiDAR_PONG_V1.X
 
 // Arduino code for LiDAR PONG EPE demo
 // Author(s): Jordan McCaughey Walsh
-// Contact: jmcc097@gmail.com 
+// > Contact: jmcc097@gmail.com 
+
+
+
 // Intendid for use with ARM based Arduino boards (Arduino DUE)
 // Matrix size 24x32
+
+
+
 
 //V1.0 [Jordan] (04/08/23):
 //   Code used for inital Presentation on 10/08/23.
 
-//V1.1 [Jordan] (19/08/23):
+//V1.0.1 [Jordan] (19/08/23):
 //  - Added collision (bug fix) and 180 degree rotortion for collisopns on tip of paddles (adds additional skill element to game).
 //  - Fixed game soft-lock bug in case where measurement successfully read on first attempt in TFminiGetDistance()
-//     > This did not actually fix the issue! This was sloppy either way. The issue could be related to the current physical setup where the
+//     > This did not actually fix the issue, but is still a bug. The issue could be related to the current physical setup where the
 //       Arduino is driving the current to LED matrix rather than an external power supply)
 //  - Added 'easyMode' toggle for children - This should be toggled with a physical switch ideally.
-//  - Will add LED brightness control once knobs arrive.
+
+//V1.0.2 [Jordan] (11/23)
 //  - Adjusted Ball spawning parameters in reset(), previous values were not competitively balanced. 
 //     > initial ball direction should now be less predictable.
 //     > more fairly confined spawn region.
+
+//V1.1 [Jordan] (03/07/24)
+//  - Fixed soft-lock issue (finally). 
+//     > 'right' and 'left' paddle positions changed from 'unsigned int' to 'int'. 'right' would go negative
+//       after sensor read 24, correspnding to 0 in game space but because of unsigned data type NeoMatrix received 4294967295.
+//  - Adjusted duration of end screen
+//  - Added timer/decontruction of walls during endscreen
+//  - Added more angles for the ball to traverse + suitable collision detection 
+//     > 202, 257, 337, 22
+
+
+
+//V1.2 [Jordan]
+//  - Feature reccomendations:
+//     > even more angles for the ball to traverse + suitable collision detection.
+//     > a more physics based collision detection that takes into account the velocity of the paddle and direction of the ball.
+//     > skins + stages / backgrounds?
+//     > IPIC/Tyndall logo might be nice.
+//     > Ability to change colour of paddles.
+
+
+
 
 #include <Adafruit_GFX.h>
 #include <Adafruit_NeoMatrix.h>
@@ -35,8 +64,9 @@ Adafruit_NeoMatrix matrix = Adafruit_NeoMatrix(8, 32, 3, 1, PIN,
   NEO_MATRIX_TOP + NEO_MATRIX_LEFT + NEO_MATRIX_ROWS + NEO_MATRIX_ZIGZAG,
   NEO_GRB + NEO_KHZ800);
 
-unsigned int left = 0;
-unsigned int right = 0;
+int left = 0;  // V1.1: DO NOT UNSIGN!
+int right = 0; // V1.1: DO NOT UNSIGN!
+
 int angle = 0;
 int radians;
 int _angle;
@@ -59,6 +89,7 @@ int y_1 = 5; //paddle y positions
 int y_2 = 26; // ""
 
 void getTFminiData(HardwareSerial &target, int* distance, int* strength){
+  //Serial.print("getTFminiData\n");
   static char i = 0;
   char j = 0;
   int checksum = 0;
@@ -88,6 +119,7 @@ void getTFminiData(HardwareSerial &target, int* distance, int* strength){
 }
 
 int getTFminiDistance(HardwareSerial &target){ // return distance read for a target sensor as an integer - this is rapid
+  //Serial.print("getTFminiDistance\n");
   int distance = 0;
   int strength = 0;
   getTFminiData(target, &distance, &strength);
@@ -97,29 +129,37 @@ int getTFminiDistance(HardwareSerial &target){ // return distance read for a tar
       return distance;
     }
   }
-  return distance;
+  return 1;
   // ^ V1.1 EDIT
 }
 
 // PONG logic and fucntions \\
 
 void calcWall() {
-  //paddel placements and detection
-  left = getTFminiDistance(Serial1)/LIDAR_DIVIDE; // player1
-  right = 24-getTFminiDistance(Serial2)/LIDAR_DIVIDE; //player2
+  //Serial.print("calcWall\n");
+  //padel placements and detection
+  left = getTFminiDistance(Serial1)*LIDAR_DIVIDE; // player1
+  //Serial.print("calcWall1\n");
+  right = 24-getTFminiDistance(Serial2)*LIDAR_DIVIDE; //player2
+  //right = getTFminiDistance(Serial2)*LIDAR_DIVIDE; //player2
+  //Serial.println(right);
 
-  //draw padels - should really have made this a seperate function for neatness
+  //Draw Padels
   for(int x = left-2; x <= left+2; x++){
     matrix.drawPixel(x, y_1, matrix.Color(0, 255, 0));
   }
-  for(int x = right-2; x <= right+2; x++){
+  //Serial.print("left_drawn\n");
+  for(int x = right-2; x <= right+2; x++){ 
     matrix.drawPixel(x, y_2, matrix.Color(255, 255, 255));
   }
+  //Serial.print("right_drawn\n");
   _wall[0] = left;  //bottom
   _wall[1] = right; //top
+  //Serial.print("RETURNING\n");
 }
 
 void enterFrameHandler(){
+  //Serial.print("enterFrameHandler\n");
   _count++;
   if (_count < _speed) {
     matrix.drawPixel(_py, _px, matrix.Color(255, 255, 255));
@@ -134,7 +174,6 @@ void enterFrameHandler(){
 }
 
 void retorted(int angle) { 
-  //Serial.println(angle);
   _angle = angle;
   if (easyMode == false)  colision++;
 }
@@ -173,53 +212,88 @@ void checkCollision() {
   //_px or _py is ball position coordinates
   if(_px == _w - 1){ //paddel position - 1 // HIGH side
     //buzz();
-    if (_angle == 315 || _angle == 0 || _angle == 45)  {
+    if (_angle == 315 || _angle == 0 || _angle == 45 || _angle == 22 || _angle == 337)  {
       if (_py == _wall[1] || _py == _wall[1]+1 || _py == _wall[1]+2 || _py == _wall[1]-1 || _py == _wall[1]-2 || _py == _wall[1]-3 || _py == _wall[1]+3)  {
         if (_angle == 0 && _py == _wall[1])  retorted(180);
-        else if (_angle == 0 && _py == _wall[1] + 1)  retorted(135);
+        else if (_angle == 0 && _py == _wall[1] + 1)  retorted(157);
         else if (_angle == 0 && _py == _wall[1] + 2)  retorted(135);
-        else if (_angle == 0 && _py == _wall[1] - 1)  retorted(225); 
+        else if (_angle == 0 && _py == _wall[1] - 1)  retorted(202); 
         else if (_angle == 0 && _py == _wall[1] - 2)  retorted(225); 
+
         else if (_angle == 45 && _py == _wall[1])  retorted(135);
         else if (_angle == 45 && _py == _wall[1] + 1)  retorted(135);
         else if (_angle == 45 && _py == _wall[1] + 2)  retorted(135); 
-        else if (_angle == 45 && _py == _wall[1] - 1)  retorted(180); 
+        else if (_angle == 45 && _py == _wall[1] - 1)  retorted(157); 
         else if (_angle == 45 && _py == _wall[1] - 2)  retorted(180); 
+
         else if (_angle == 315 && _py == _wall[1])  retorted(225); 
-        else if (_angle == 315 && _py == _wall[1] + 1)  retorted(180); 
+        else if (_angle == 315 && _py == _wall[1] + 1)  retorted(157); 
         else if (_angle == 315 && _py == _wall[1] + 2)  retorted(180); 
         else if (_angle == 315 && _py == _wall[1] - 1)  retorted(225); 
         else if (_angle == 315 && _py == _wall[1] - 2)  retorted(225); 
 
+        //V1.2 NEW ANGLES
+        else if (_angle == 337 && _py == _wall[1])  retorted(202); 
+        else if (_angle == 337 && _py == _wall[1] + 1)  retorted(180); 
+        else if (_angle == 337 && _py == _wall[1] + 2)  retorted(157); 
+        else if (_angle == 337 && _py == _wall[1] - 1)  retorted(225); 
+        else if (_angle == 337 && _py == _wall[1] - 2)  retorted(225); 
+
+        else if (_angle == 22 && _py == _wall[1])  retorted(157);
+        else if (_angle == 22 && _py == _wall[1] + 1)  retorted(135);
+        else if (_angle == 22 && _py == _wall[1] + 2)  retorted(135); 
+        else if (_angle == 22 && _py == _wall[1] - 1)  retorted(180); 
+        else if (_angle == 22 && _py == _wall[1] - 2)  retorted(202);         
+
         //V1.1 EDIT
         else if (_angle == 315 && _py == _wall[1] + 3)  retorted(135);
+        else if (_angle == 337 && _py == _wall[1] + 3)  retorted(157);
         else if (_angle == 45 && _py == _wall[1] - 3)  retorted(225);
+        else if (_angle == 22 && _py == _wall[1] - 3)  retorted(202);
       }
     }
   }
   else if (_px == 6)  { //paddel position + 1 //low side
     //buzz();
-    if (_angle == 225 || _angle == 180 || _angle == 135)  {
+    if (_angle == 225 || _angle == 180 || _angle == 135 || _angle == 157 || _angle == 202)  {
       if (_py == _wall[0] || _py == _wall[0]+1 || _py == _wall[0]+2 || _py == _wall[0]-1 || _py == _wall[0]-2 || _py == _wall[0]+3 || _py == _wall[0]-3)  {
         if (_angle == 180 && _py == _wall[0])  retorted(0);
-        else if (_angle == 180 && _py == _wall[0] + 1)  retorted(45);
+        else if (_angle == 180 && _py == _wall[0] + 1)  retorted(22);
         else if (_angle == 180 && _py == _wall[0] + 2)  retorted(45);
-        else if (_angle == 180 && _py == _wall[0] - 1)  retorted(315); 
-        else if (_angle == 180 && _py == _wall[0] - 2)  retorted(315); 
+        else if (_angle == 180 && _py == _wall[0] - 1)  retorted(337); 
+        else if (_angle == 180 && _py == _wall[0] - 2)  retorted(315);
+
         else if (_angle == 135 && _py == _wall[0])  retorted(45);
-        else if (_angle == 135 && _py == _wall[0] + 1)  retorted(45);
+        else if (_angle == 135 && _py == _wall[0] + 1)  retorted(22); //SWAP?
         else if (_angle == 135 && _py == _wall[0] + 2)  retorted(45);   
-        else if (_angle == 135 && _py == _wall[0] - 1)  retorted(0); 
-        else if (_angle == 135 && _py == _wall[0] - 2)  retorted(0); 
+        else if (_angle == 135 && _py == _wall[0] - 1)  retorted(337); //SWAP?
+        else if (_angle == 135 && _py == _wall[0] - 2)  retorted(0);
+
         else if (_angle == 225 && _py == _wall[0])  retorted(315); 
-        else if (_angle == 225 && _py == _wall[0] + 1)  retorted(0); 
+        else if (_angle == 225 && _py == _wall[0] + 1)  retorted(337); 
         else if (_angle == 225 && _py == _wall[0] + 2)  retorted(0); 
         else if (_angle == 225 && _py == _wall[0] - 1)  retorted(315); 
         else if (_angle == 225 && _py == _wall[0] - 2)  retorted(315); 
 
+        //V1.2 NEW ANGLES
+        else if (_angle == 202 && _py == _wall[0])  retorted(337); 
+        else if (_angle == 202 && _py == _wall[0] + 1)  retorted(0); 
+        else if (_angle == 202 && _py == _wall[0] + 2)  retorted(0); 
+        else if (_angle == 202 && _py == _wall[0] - 1)  retorted(315); 
+        else if (_angle == 202 && _py == _wall[0] - 2)  retorted(315); 
+
+        else if (_angle == 157 && _py == _wall[0])  retorted(22);
+        else if (_angle == 157 && _py == _wall[0] + 1)  retorted(45); //SWAP?
+        else if (_angle == 157 && _py == _wall[0] + 2)  retorted(45);   
+        else if (_angle == 157 && _py == _wall[0] - 1)  retorted(0); //SWAP?
+        else if (_angle == 157 && _py == _wall[0] - 2)  retorted(337);
+
         //V1.1 EDIT
         else if (_angle == 135 && _py == _wall[0] - 3)  retorted(315);
         else if (_angle == 225 && _py == _wall[0] + 3)  retorted(45);
+        else if (_angle == 157 && _py == _wall[0] - 3)  retorted(315);
+        else if (_angle == 202 && _py == _wall[0] + 3)  retorted(45);
+
       }
     }
   }
@@ -238,10 +312,14 @@ void checkCollision() {
   else if (_py == _h)  { //these are the side walls
     if (_angle == 45)  _angle = 315;
     else if (_angle == 135)  _angle = 225;
+    else if (_angle == 157) _angle = 202;
+    else if (_angle == 22) _angle = 337;
   }
   else if (_py == 1)  {
     if (_angle == 225)  _angle = 135;
     else if (_angle == 315)  _angle = 45;
+    else if (_angle == 202) _angle = 157;
+    else if (_angle == 337) _angle = 22;
   }
 }
 
@@ -268,9 +346,39 @@ void calcAngleIncrement() {
     _px += 1;
     _py -= 1;
   }
+
+  //New Angles V1.2 - 'if x position divisible by 2 then traverse in y'
+  else if (_angle == 337)  {
+    if (_px%2==0) _py -= 1;
+    _px += 1;
+    
+    
+    //_py -= 1;
+  }
+  else if (_angle == 22)  {
+    if (_px%2==0) _py += 1;
+    _px += 1;
+    
+    
+    //_py -= 1;
+  }
+  else if (_angle == 157)  {
+    if (_px%2==0) _py += 1;
+    _px -= 1;
+    
+    
+    //_py -= 1;
+  }
+  else if (_angle == 202)  {
+    if (_px%2==0) _py -= 1;
+    _px -= 1;
+    //if (_px%2==0) _py -= 1;
+    
+    //_py -= 1;
+  }                  // MIGHT WANT TO SWAP ORDER OF _px or _py in above statements!
 }
 
-// Primary Game Operation \\
+// Primary Game Operation //
 
 void menu(){ //logic for starting the game.. hold hands up close to the sensors for a specified amount of time to begin
   bool start = false;
@@ -284,8 +392,8 @@ void menu(){ //logic for starting the game.. hold hands up close to the sensors 
   bool indicator = false;
 
   while(start == false){
-    player1 = getTFminiDistance(Serial1)/LIDAR_DIVIDE; //this implementation for getting distance works surprisingly well
-    player2 = getTFminiDistance(Serial2)/LIDAR_DIVIDE;
+    player1 = getTFminiDistance(Serial1)*LIDAR_DIVIDE; //this implementation for getting distance works surprisingly well
+    player2 = getTFminiDistance(Serial2)*LIDAR_DIVIDE;
 
     matrix.clear();
     logo();
@@ -348,7 +456,7 @@ void pong(){
         winner = 2;
       }
     }
-    delay(10); //Gamerate
+    //delay(15); //Gamerate
   }
   endScreen();
   return;
@@ -356,10 +464,17 @@ void pong(){
 
 void endScreen(){
   int end_count = 0;
+  int i = 80;
   if (winner == 1){
-    while(end_count <= 300){
+    while(end_count <= 160){
       matrix.clear();
-      drawWalls();
+      //drawWalls();
+      if(end_count%2==0) i--;
+      int led_c = (int)(i/2.5);
+      for(int y = 0; y <= led_c; y++){
+        matrix.drawPixel(0, y, matrix.Color(255, 255, 255));
+        matrix.drawPixel(23, 32-y, matrix.Color(255, 255, 255));
+      }
       test();
       drawPlayer1Win();
       matrix.show();
@@ -367,9 +482,16 @@ void endScreen(){
       delay(10);
     }
   } else {
-    while(end_count <= 300){
+    int i = 80;
+    while(end_count <= 160){
       matrix.clear();
-      drawWalls();
+      //drawWalls();
+      if(end_count%2==0) i--;
+      int led_c = (int)(i/2.5);
+      for(int y = 0; y <= led_c; y++){
+        matrix.drawPixel(0, y, matrix.Color(255, 255, 255));
+        matrix.drawPixel(23, 32-y, matrix.Color(255, 255, 255));
+      }
       test();
       drawPlayer2Win();
       matrix.show();
@@ -384,8 +506,8 @@ void endScreen(){
 //model function for LiDAR
 void test(){
   //y is fixed for 1 player and the other
-  int player1 = getTFminiDistance(Serial1)/LIDAR_DIVIDE;
-  int player2 = getTFminiDistance(Serial2)/LIDAR_DIVIDE;
+  int player1 = getTFminiDistance(Serial1)*LIDAR_DIVIDE;
+  int player2 = getTFminiDistance(Serial2)*LIDAR_DIVIDE;
   int y_1 = 5;
   int y_2 = 26;
 
@@ -919,7 +1041,7 @@ void setup(){
   matrix.begin();
   LEDbrightness = 10;
   matrix.setBrightness(LEDbrightness);
-  easyMode = false;
+  easyMode = true;
 }
  
 void loop(){
